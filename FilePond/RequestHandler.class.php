@@ -427,9 +427,6 @@ class RequestHandler
             );
         }
 
-        // TODO: REMOVE
-        return;
-
         // remove directory
         self::deleteTempDirectory($fileId);
 
