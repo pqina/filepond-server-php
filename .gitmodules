@@ -1,0 +1,3 @@
+[submodule "Doka"]
+	path = Doka
+	url = https://github.com/pqina/doka-php
