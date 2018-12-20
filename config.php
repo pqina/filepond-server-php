@@ -1,51 +1,19 @@
 <?php
 
-// Load the FilePond helper class
-require_once('FilePond/RequestHandler.class.php');
+// where to get files from
+const ENTRY_FIELD = 'filepond';
 
-// Load Doka image transform class
-require_once('Doka/Doka.class.php');
+// where to write files to
+const TRANSFER_DIR = 'tmp';
+const UPLOAD_DIR = 'uploads';
+const VARIANTS_DIR = 'variants';
 
-// Set temp file location
-FilePond\RequestHandler::$tmp_dir = 'tmp' . DIRECTORY_SEPARATOR;
+// name to use for the file metadata object
+const METADATA_FILENAME = '.metadata';
 
-// Create a Doka transform function
-function applyDokaImageTransform($item, $source, $target) {
-    
-    $metadata = $item->getMetadata();
+// this automatically creates the upload and transfer directories, if they're not there already
+if (!is_dir(UPLOAD_DIR)) mkdir(UPLOAD_DIR, 0755);
+if (!is_dir(TRANSFER_DIR)) mkdir(TRANSFER_DIR, 0755);
 
-    // No metadata found, just copy the file
-    if (!isset($metadata)) {
-        return rename($source, $target);
-    }
-
-    // A list of transforms already applied on the client, we need these as we don't have to apply them again
-    $clientTransforms = isset($metadata->transform) ? $metadata->transform->client : [];
-
-    // Build the output object based on the transform property
-    $output = [
-        'quality' => isset($metadata->transform) ? $metadata->transform->quality : null,
-        'type' => isset($metadata->transform) ? $metadata->transform->type : null
-    ];
-
-    // The metadata object contains the server transforms to apply
-    $serverTransforms = $metadata;
-
-    // Remove transforms already applied on the client
-    foreach($clientTransforms as $clientTransform) {
-        if (!property_exists($serverTransforms, $clientTransform)) {
-            continue;
-        }
-        unset($serverTransforms->{$clientTransform});
-    }
-
-    // Transform and save the file
-    Doka\transform(
-        $source,
-        $target,
-        $serverTransforms,
-        $output
-    );
-}
-
-FilePond\RequestHandler::$file_store_function = 'applyDokaImageTransform';
+// this is optional and only needed if you're going to do server image transforms
+require_once('config_doka.php');
