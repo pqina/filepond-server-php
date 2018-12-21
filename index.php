@@ -4,7 +4,7 @@
 header('Access-Control-Allow-Origin: *');
 
 // Allow the following methods to access this file
-header('Access-Control-Allow-Methods: OPTIONS, GET, DELETE, POST');
+header('Access-Control-Allow-Methods: OPTIONS, GET, DELETE, POST, HEAD');
 
 // Load the FilePond class
 require_once('FilePond.class.php');
@@ -30,7 +30,7 @@ function handle_file_transfer($transfer) {
     $files = $transfer->getFiles();
 
     // something went wrong, most likely a field name mismatch
-    if (count($files) === 0) { return http_response_code(400); }
+    if (count($files) === 0) return http_response_code(400);
 
     // store files
     FilePond\store_transfer(TRANSFER_DIR, $transfer);
@@ -45,7 +45,7 @@ function handle_file_transfer($transfer) {
 function handle_revert_file_transfer($id) {
 
     // test if id was supplied
-    if (!isset($id) || !FilePond\is_valid_transfer_id($id)) { return http_response_code(400); }
+    if (!isset($id) || !FilePond\is_valid_transfer_id($id)) return http_response_code(400);
 
     // remove transfer directory
     FilePond\remove_transfer_directory(TRANSFER_DIR, $id);
@@ -68,20 +68,14 @@ function handle_restore_file_transfer($id) {
     // No file returned, file not found
     if (count($files) === 0) return http_response_code(404);
 
-    // return first file
-    $file = FilePond\read_file($files[0]['tmp_name']);
-
-    // something went wrong while reading the file
-    if (!$file) return http_response_code(500);
-
     // Return file
-    FilePond\echo_file($file);
+    FilePond\echo_file($files[0]);
 }
 
 function handle_load_local_file($ref) {
 
     // Stop here if no id supplied
-    if (empty($ref)) { return http_response_code(400); }
+    if (empty($ref)) return http_response_code(400);
 
     // In this example implementation the file id is simply the filename and 
     // we request the file from the uploads folder, it could very well be 
@@ -90,14 +84,8 @@ function handle_load_local_file($ref) {
     // path to file
     $path = UPLOAD_DIR . DIRECTORY_SEPARATOR . FilePond\sanitize_filename($ref);
 
-    // return first file
-    $file = FilePond\read_file($path);
-    
-    // something went wrong while reading the file
-    if (!$file) return http_response_code(500);
-
     // Return file
-    FilePond\echo_file($file);
+    FilePond\echo_file($path);
 }
 
 function handle_fetch_remote_file($url) {
@@ -109,16 +97,26 @@ function handle_fetch_remote_file($url) {
     if (!FilePond\is_url($url)) return http_response_code(400);
 
     // Let's try to get the remote file content
-    $response = FilePond\fetch($url);
+    $file = FilePond\fetch($url);
 
     // Something went wrong
-    if ($response === null) return http_response_code(500);
+    if (!$file) return http_response_code(500);
 
     // remote server returned invalid response
-    if (!$response['success']) return http_response_code($response['code']);
+    if ($file['error'] !== 0) return http_response_code($file['error']);
     
-    // Return file
-    header('Content-Type: ' . $response['type']);
-    header('Content-Length: ' . $response['length']);
-    echo $response['content'];
+    // if we only return headers we store the file in the transfer folder
+    if ($_SERVER['REQUEST_METHOD'] === 'HEAD') {
+        
+        // deal with this file as if it's a file transfer, will return unique id to client
+        $transfer = new FilePond\Transfer();
+        $transfer->restore($file);
+        FilePond\store_transfer(TRANSFER_DIR, $transfer);
+
+        // send transfer id back to client
+        header('X-Content-Transfer-Id: ' . $transfer->getId());
+    }
+
+    // time to return the file to the client
+    FilePond\echo_file($file);
 }

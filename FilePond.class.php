@@ -8,14 +8,17 @@ require_once('./Helper/ServerExceptions.php');
 
 function fetch($url) {
     try {
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 
-        $content = curl_exec($ch);
-        if ($content === FALSE) {
-            throw new \Exception(curl_error($ch), curl_errno($ch));
-        }
+        // create temp file
+        $out = tmpfile();
+
+        // go!
+        $ch = curl_init(str_replace(' ','%20',$url));
+        curl_setopt($ch, CURLOPT_FILE, $out);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 50);
+
+        if (!curl_exec($ch)) throw new \Exception(curl_error($ch), curl_errno($ch));
 
         $type = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
         $length = curl_getinfo($ch, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
@@ -23,19 +26,17 @@ function fetch($url) {
 
         curl_close ($ch);
 
-        $success = $code >= 200 && $code < 300;
-
         return array(
-            'code' => $code,
-            'content' => $content,
+            'tmp_name' => stream_get_meta_data($out)['uri'],
+            'name' => sanitize_filename(pathinfo($url)['basename']),
             'type' => $type,
             'length' => $length,
-            'success' => $success
+            'error' => $code >= 200 && $code < 300 ? 0 : $code,
+            'ref' => $out, // need this so the file is not automatically removed
         );
-        
     }
     catch(Exception $e) {
-        return null;
+        return false;
     }
 }
 
@@ -92,6 +93,7 @@ function create_secure_directory($path) {
 function write_file($path, $data, $filename) {
     $handle = fopen($path . DIRECTORY_SEPARATOR . $filename, 'w');
     fwrite($handle, $data);
+    fclose($handle);
 }
 
 function is_url($str) {
@@ -99,12 +101,19 @@ function is_url($str) {
 }
 
 function echo_file($file) {
+
+    // read file object
+    if (is_string($file)) $file = read_file($file);
+
+    // something went wrong while reading the file
+    if (!$file) http_response_code(500);
+    
     // Allow to read Content Disposition (so we can read the file name on the client side)
-    header('Access-Control-Expose-Headers: Content-Disposition');
+    header('Access-Control-Expose-Headers: Content-Disposition, Content-Length, X-Content-Transfer-Id');
     header('Content-Type: ' . $file['type']);
     header('Content-Length: ' . $file['length']);
     header('Content-Disposition: inline; filename="' . $file['name'] . '"');
-    echo $file['content'];
+    echo isset($file['content']) ? $file['content'] : read_file_contents($file['tmp_name']);
 }
 
 function read_file_contents($filename) {
@@ -237,7 +246,7 @@ function route_api_request($entry, $routes) {
     // post new files
     if ($request_method === 'POST') {
         $post = get_post($entry);
-        if (!$post) { return; }
+        if (!$post) return;
         $transfer = new Transfer();
         $transfer->populate($entry);
         return call_user_func($routes['FILE_TRANSFER'], $transfer);
@@ -249,7 +258,7 @@ function route_api_request($entry, $routes) {
     }
 
     // fetch, load, restore
-    if ($request_method === 'GET') {
+    if ($request_method === 'GET' || $request_method === 'HEAD') {
         $handlers = array(
             'fetch' => 'FETCH_REMOTE_FILE',
             'restore' => 'RESTORE_FILE_TRANSFER',

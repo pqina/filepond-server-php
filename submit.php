@@ -49,7 +49,7 @@ function handle_base64_encoded_file_post($files) {
         $file = @json_decode($file);
 
         // Skip files that failed to decode
-        if (!is_object($file)) {continue;}
+        if (!is_object($file)) continue;
 
         // write file to disk
         FilePond\write_file(
@@ -69,7 +69,7 @@ function handle_transfer_ids_post($ids) {
         $transfer = FilePond\get_transfer(TRANSFER_DIR, $id);
         
         // transfer not found
-        if (!$transfer) {continue;}
+        if (!$transfer) continue;
         
         // move files
         $files = $transfer->getFiles(defined('TRANSFER_PROCESSOR') ? TRANSFER_PROCESSOR : null);
