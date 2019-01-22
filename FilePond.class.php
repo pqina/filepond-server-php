@@ -211,7 +211,7 @@ function is_valid_transfer_id($id) {
 
 function get_transfer($path, $id) {
 
-    if (!is_valid_transfer_id($id)) { return false; }
+    if (!is_valid_transfer_id($id)) return false;
 
     $transfer = new Transfer($id);
 
@@ -232,42 +232,57 @@ function get_post($entry) {
     return isset($_FILES[$entry]) || isset($_POST[$entry]) ? new Post($entry) : false;
 }
 
-function route_form_post($entry, $routes) {
-    $post = get_post($entry);
-    if (!$post) { return; }
-    if (!isset($routes[$post->getFormat()])) { return; }
-    call_user_func($routes[$post->getFormat()], $post->getValues());
+function route_form_post($entries, $routes) {
+
+    // if a singly field entry is supplied, turn it into an array
+    if (is_string($entries)) $entries = array($entries);
+    
+    foreach ($entries as $entry) {
+        $post = get_post($entry);
+        if (!$post) continue;
+        if (!isset($routes[$post->getFormat()])) continue;
+        call_user_func($routes[$post->getFormat()], $post->getValues());
+    }
 } 
 
-function route_api_request($entry, $routes) {
+function route_api_request($entries, $routes) {
 
+    // if a singly field entry is supplied, turn it into an array
+    if (is_string($entries)) $entries = array($entries);
+    
+    // get the request method so we don't have to use $_SERVER each time
     $request_method = $_SERVER['REQUEST_METHOD'];
 
-    // post new files
-    if ($request_method === 'POST') {
-        $post = get_post($entry);
-        if (!$post) return;
-        $transfer = new Transfer();
-        $transfer->populate($entry);
-        return call_user_func($routes['FILE_TRANSFER'], $transfer);
-    }
+    // loop over all set entry fields to find posted values
+    foreach ($entries as $entry) {
+            
+        // post new files
+        if ($request_method === 'POST') {
+            $post = get_post($entry);
+            if (!$post) continue;
+            $transfer = new Transfer();
+            $transfer->populate($entry);
+            return call_user_func($routes['FILE_TRANSFER'], $transfer);
+        }
 
-    // revert existing transfer
-    if ($request_method === 'DELETE') {
-        return call_user_func($routes['REVERT_FILE_TRANSFER'], file_get_contents('php://input'));
-    }
+        // revert existing transfer
+        if ($request_method === 'DELETE') {
+            return call_user_func($routes['REVERT_FILE_TRANSFER'], file_get_contents('php://input'));
+        }
 
-    // fetch, load, restore
-    if ($request_method === 'GET' || $request_method === 'HEAD') {
-        $handlers = array(
-            'fetch' => 'FETCH_REMOTE_FILE',
-            'restore' => 'RESTORE_FILE_TRANSFER',
-            'load' => 'LOAD_LOCAL_FILE'
-        );
-        foreach ($handlers as $param => $handler) {
-            if (isset($_GET[$param])) {
-                return call_user_func($routes[$handler], $_GET[$param]);
+        // fetch, load, restore
+        if ($request_method === 'GET' || $request_method === 'HEAD') {
+            $handlers = array(
+                'fetch' => 'FETCH_REMOTE_FILE',
+                'restore' => 'RESTORE_FILE_TRANSFER',
+                'load' => 'LOAD_LOCAL_FILE'
+            );
+            foreach ($handlers as $param => $handler) {
+                if (isset($_GET[$param])) {
+                    return call_user_func($routes[$handler], $_GET[$param]);
+                }
             }
         }
+
     }
 }
