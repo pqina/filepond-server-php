@@ -18,8 +18,8 @@ The `tmp` and `upload` file paths can be configured in the `config.php` file.
 
 ```php
 
-// where to get files from
-const ENTRY_FIELD = 'filepond';
+// where to get files from, can also be an array of fields
+const ENTRY_FIELD = 'filepond'; 
 
 // where to write files to
 const TRANSFER_DIR = 'tmp';
