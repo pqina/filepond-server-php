@@ -4,7 +4,13 @@
 header('Access-Control-Allow-Origin: *');
 
 // Allow the following methods to access this file
-header('Access-Control-Allow-Methods: OPTIONS, GET, DELETE, POST, HEAD');
+header('Access-Control-Allow-Methods: OPTIONS, GET, DELETE, POST, HEAD, PATCH');
+
+// Allow the following headers in preflight
+header('Access-Control-Allow-Headers: content-type, upload-length, upload-offset, upload-name');
+
+// Allow the following headers in response
+header('Access-Control-Expose-Headers: upload-offset');
 
 // Load the FilePond class
 require_once('FilePond.class.php');
@@ -18,6 +24,7 @@ FilePond\catch_server_exceptions();
 // Route request to handler method
 FilePond\route_api_request(ENTRY_FIELD, [
     'FILE_TRANSFER' => 'handle_file_transfer',
+    'PATCH_FILE_TRANSFER' => 'handle_patch_file_transfer',
     'REVERT_FILE_TRANSFER' => 'handle_revert_file_transfer',
     'RESTORE_FILE_TRANSFER' => 'handle_restore_file_transfer',
     'LOAD_LOCAL_FILE' => 'handle_load_local_file',
@@ -30,16 +37,107 @@ function handle_file_transfer($transfer) {
     $files = $transfer->getFiles();
 
     // something went wrong, most likely a field name mismatch
-    if (count($files) === 0) return http_response_code(400);
+    if ($files !== null && count($files) === 0) return http_response_code(400);
 
-    // store files
+    // store data
     FilePond\store_transfer(TRANSFER_DIR, $transfer);
+
+    // created the temp entry
+    http_response_code(201);
     
     // returns plain text content
     header('Content-Type: text/plain');
 
     // remove item from array Response contains uploaded file server id
     echo $transfer->getId();
+}
+
+function handle_patch_file_transfer($id) {
+
+    // location of patch files
+    $dir = TRANSFER_DIR . DIRECTORY_SEPARATOR . $id . DIRECTORY_SEPARATOR;
+    
+    // exit if is get
+    if ($_SERVER['REQUEST_METHOD'] === 'HEAD') {
+        $patch = glob($dir . '.patch.*');
+        $offsets = array();
+        $size = '';
+        $last_offset = 0;
+        foreach ($patch as $filename) {
+
+            // get size of chunk
+            $size = filesize($filename);
+
+            // get offset of chunk
+            list($dir, $offset) = explode('.patch.', $filename, 2);
+
+            // offsets
+            array_push($offsets, $offset);
+
+            // test if is missing previous chunk
+            // don't test first chunk (previous chunk is non existent)
+            if ($offset > 0 && !in_array($offset - $size, $offsets)) {
+                $last_offset = $offset - $size;
+                break;
+            }
+
+            // last offset is at least next offset
+            $last_offset = $offset + $size;
+        }
+
+        // return offset
+        http_response_code(200);
+        header('Upload-Offset: ' . $last_offset);
+        return;
+    }
+
+    // get patch data
+    $name = $_SERVER['HTTP_UPLOAD_NAME'];
+    $offset = $_SERVER['HTTP_UPLOAD_OFFSET'];
+    $length = $_SERVER['HTTP_UPLOAD_LENGTH'];
+
+    // write patch file for this request
+    file_put_contents($dir . '.patch.' . $offset, fopen('php://input', 'r'));
+
+    // calculate total size of patches
+    $size = 0;
+    $patch = glob($dir . '.patch.*');
+    foreach ($patch as $filename) {
+        $size += filesize($filename);
+    }
+
+    // if total size equals length of file we have gathered all patch files
+    if ($size == $length) {
+
+        // create output file
+        $file_handle = fopen($dir . $name, 'w');
+
+        // write patches to file
+        foreach ($patch as $filename) {
+
+            // get offset from filename
+            list($dir, $offset) = explode('.patch.', $filename, 2);
+
+            // read patch and close
+            $patch_handle = fopen($filename, 'r');
+            $patch_contents = fread($patch_handle, filesize($filename));
+            fclose($patch_handle); 
+            
+            // apply patch
+            fseek($file_handle, $offset);
+            fwrite($file_handle, $patch_contents);
+        }
+
+        // remove patches
+        foreach ($patch as $filename) {
+            unlink($filename);
+        }
+
+        // done with file
+        fclose($file_handle);
+    }
+
+    http_response_code(204);
 }
 
 function handle_revert_file_transfer($id) {

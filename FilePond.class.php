@@ -74,7 +74,6 @@ function create_directory($path) {
 }
 
 function secure_directory($path) {
-
     $content = '# Don\'t list directory contents
 IndexIgnore *
 # Disable script execution
@@ -160,8 +159,9 @@ function store_transfer($path, $transfer) {
         write_file($path, @json_encode($transfer->getMetadata()), METADATA_FILENAME);
     }
 
-    // store main file
+    // store main file if set (if not set, we expect to receive chunks in the near future)
     $files = $transfer->getFiles();
+    if ($files === null) return;
     $file = $files[0];
     move_file($file, $path);
 
@@ -223,7 +223,7 @@ function get_transfer($path, $id) {
 
     $variants = get_files($path . DIRECTORY_SEPARATOR . VARIANTS_DIR, '*.*');
 
-    $transfer->restore($file, $variants, $metadata);
+    $transfer->restore($file, $variants, null, $metadata);
 
     return $transfer;
 }
@@ -255,7 +255,7 @@ function route_api_request($entries, $routes) {
 
     // loop over all set entry fields to find posted values
     foreach ($entries as $entry) {
-            
+        
         // post new files
         if ($request_method === 'POST') {
             $post = get_post($entry);
@@ -271,15 +271,16 @@ function route_api_request($entries, $routes) {
         }
 
         // fetch, load, restore
-        if ($request_method === 'GET' || $request_method === 'HEAD') {
+        if ($request_method === 'GET' || $request_method === 'HEAD' || $request_method === 'PATCH') {
             $handlers = array(
                 'fetch' => 'FETCH_REMOTE_FILE',
                 'restore' => 'RESTORE_FILE_TRANSFER',
-                'load' => 'LOAD_LOCAL_FILE'
+                'load' => 'LOAD_LOCAL_FILE',
+                'patch' => 'PATCH_FILE_TRANSFER'
             );
             foreach ($handlers as $param => $handler) {
                 if (isset($_GET[$param])) {
-                    return call_user_func($routes[$handler], $_GET[$param]);
+                    return call_user_func($routes[$handler], $_GET[$param], $entry);
                 }
             }
         }
