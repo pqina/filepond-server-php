@@ -2,6 +2,7 @@
 
 A PHP server to handle [FilePond](https:pqina.nl/filepond) file uploads and [Doka](https://pqina.nl/doka) image transforms.
 
+**⚠️ If you're using a version of the PHP API released before 2019-09-19, please update to the latest version to fix a potential security vulnerability**
 
 ## Instructions
 
