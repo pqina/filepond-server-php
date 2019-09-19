@@ -42,7 +42,9 @@ function fetch($url) {
 
 function sanitize_filename($filename) {
     $info = pathinfo($filename);
-    return sanitize_filename_part($info['filename']) . '.' . sanitize_filename_part($info['extension']);
+    $name = sanitize_filename_part($info['filename']);
+    $extension = sanitize_filename_part($info['extension']);
+    return (strlen($name) > 0 ? $name : '_') . '.' . $extension;
 }
 
 function sanitize_filename_part($str) {
@@ -161,6 +163,7 @@ function store_transfer($path, $transfer) {
 
     // store main file if set (if not set, we expect to receive chunks in the near future)
     $files = $transfer->getFiles();
+
     if ($files === null) return;
     $file = $files[0];
     move_file($file, $path);

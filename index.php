@@ -92,9 +92,16 @@ function handle_patch_file_transfer($id) {
     }
 
     // get patch data
-    $name = $_SERVER['HTTP_UPLOAD_NAME'];
     $offset = $_SERVER['HTTP_UPLOAD_OFFSET'];
     $length = $_SERVER['HTTP_UPLOAD_LENGTH'];
+
+    // should be numeric values, else exit
+    if (!is_numeric($offset) || !is_numeric($length)) {
+        return http_response_code(400);
+    }
+
+    // get sanitized name
+    $name = FilePond\sanitize_filename($_SERVER['HTTP_UPLOAD_NAME']);
 
     // write patch file for this request
     file_put_contents($dir . '.patch.' . $offset, fopen('php://input', 'r'));
