@@ -72,8 +72,12 @@ function handle_patch_file_transfer($id) {
             list($dir, $offset) = explode('.patch.', $filename, 2);
 
             // offsets
-            array_push($offsets, $offset);
+            array_push($offsets, intval($offset));
+        }
 
+        sort($offsets);
+
+        foreach ($offsets as $offset) {
             // test if is missing previous chunk
             // don't test first chunk (previous chunk is non existent)
             if ($offset > 0 && !in_array($offset - $size, $offsets)) {
