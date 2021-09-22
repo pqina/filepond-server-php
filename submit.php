@@ -73,6 +73,8 @@ function handle_transfer_ids_post($ids) {
         
         // move files
         $files = $transfer->getFiles(defined('TRANSFER_PROCESSOR') ? TRANSFER_PROCESSOR : null);
+
+        if($files != null)
         foreach($files as $file) {
             FilePond\move_file($file, UPLOAD_DIR);
         }
