@@ -98,7 +98,8 @@ function write_file($path, $data, $filename) {
 }
 
 function is_url($str) {
-    return filter_var($str, FILTER_VALIDATE_URL);
+    if (!filter_var($str, FILTER_VALIDATE_URL)) return false;
+    return in_array(parse_url($str, PHP_URL_SCHEME),['http', 'https', 'ftp']);
 }
 
 function echo_file($file) {
