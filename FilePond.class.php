@@ -2,9 +2,9 @@
 
 namespace FilePond;
 
-require_once('./Helper/Transfer.class.php');
-require_once('./Helper/Post.class.php');
-require_once('./Helper/ServerExceptions.php');
+require_once(__DIR__ . '/Helper/Transfer.class.php');
+require_once(__DIR__ . '/Helper/Post.class.php');
+require_once(__DIR__ . '/Helper/ServerExceptions.php');
 
 function fetch($url) {
     try {
