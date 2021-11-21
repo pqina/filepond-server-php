@@ -39,6 +39,24 @@ function handle_file_transfer($transfer) {
     // something went wrong, most likely a field name mismatch
     if ($files !== null && count($files) === 0) return http_response_code(400);
 
+    // test if server had trouble copying files
+    $file_transfers_with_errors = array_filter($files, function($file) { return $file['error'] !== 0; });
+    if (count($file_transfers_with_errors)) {
+        foreach ($file_transfers_with_errors as $file) {
+            trigger_error(sprintf("Uploading file \"%s\" failed with code \"" . $file['error'] . "\".", $file['name']), E_USER_WARNING);
+        }
+        return http_response_code(500);
+    }
+
+    // test if files are of invalid format
+    $file_transfers_with_invalid_file_type = count(ALLOWED_FILE_FORMATS) ? array_filter($files, function($file) { return !in_array($file['type'], ALLOWED_FILE_FORMATS); }) : array();
+    if (count($file_transfers_with_invalid_file_type)) {
+        foreach ($file_transfers_with_invalid_file_type as $file) {
+            trigger_error(sprintf("Uploading file \"%s\" failed with code \"" . $file['type'] . " is not allowed.\".", $file['name']), E_USER_WARNING);
+        }
+        return http_response_code(415);
+    }
+
     // store data
     FilePond\store_transfer(TRANSFER_DIR, $transfer);
 
