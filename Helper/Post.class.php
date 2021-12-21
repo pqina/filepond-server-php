@@ -48,7 +48,7 @@ class Post {
             $this->format = 'FILE_OBJECTS';
         }
 
-        if (isset($_POST[$entry])) {
+        else if (isset($_POST[$entry])) {
             $this->values = to_array($_POST[$entry]);
             if (is_encoded_file($this->values[0])) {
                 $this->format = 'BASE64_ENCODED_FILE_OBJECTS';
